@@ -439,3 +439,6 @@ export const botConfig = {
   // Set any feature to `false` to disable it globally.
   features: {
     // Core systems.
+ },
+
+};
