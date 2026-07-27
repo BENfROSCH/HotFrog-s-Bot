@@ -274,20 +274,6 @@ const botConfig = {
   },
 
   // =========================
-  // BIRTHDAY SETTINGS
-  // =========================
-  birthday: {
-    // Role ID given to users on their birthday.
-    defaultRole: null,
-
-    // Channel ID where birthday announcements are posted.
-    announcementChannel: null,
-
-    // Timezone used to calculate birthday dates.
-    timezone: "UTC",
-  },
-
-  // =========================
   // VERIFICATION SETTINGS
   // =========================
   verification: {
@@ -356,24 +342,6 @@ const botConfig = {
   },
 
   // =========================
-  // WELCOME / GOODBYE MESSAGES
-  // =========================
-  welcome: {
-    // Welcome template posted when a user joins.
-    // Placeholders: {user}, {server}, {memberCount}
-    defaultWelcomeMessage:
-      "Welcome {user} to {server}! We now have {memberCount} members!",
-    // Goodbye template posted when a user leaves.
-    // Placeholders: {user}, {memberCount}
-    defaultGoodbyeMessage:
-      "{user} has left the server. We now have {memberCount} members.",
-    // Channel ID for welcome messages.
-    defaultWelcomeChannel: null,
-    // Channel ID for goodbye messages.
-    defaultGoodbyeChannel: null,
-  },
-
-  // =========================
   // COUNTER CHANNELS
   // =========================
   counters: {
@@ -437,26 +405,18 @@ const botConfig = {
   // FEATURE TOGGLES
   // =========================
   // Set any feature to `false` to disable it globally.
-  features: {
+   features: {
     // Core systems.
- },
-
+  },
 };
+
 function validateConfig() {
-  const missing = [];
-
-  if (!process.env.BOT_TOKEN) {
-    missing.push("BOT_TOKEN");
-  }
-
-  if (missing.length > 0) {
-    throw new Error(
-      `Missing required configuration: ${missing.join(", ")}`
-    );
-  }
-
   return true;
 }
 
+function getColor(type = "primary") {
+  return botConfig.embeds.colors[type] || botConfig.embeds.colors.primary;
+}
+
 export default botConfig;
-export { botConfig, validateConfig };
+export { botConfig, validateConfig, getColor };
