@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger.js';
 
-export const botConfig = {
+const botConfig = {
   // =========================
   // BOT PRESENCE (what users see under the bot name)
   // =========================
@@ -442,3 +442,21 @@ export const botConfig = {
  },
 
 };
+function validateConfig() {
+  const missing = [];
+
+  if (!process.env.BOT_TOKEN) {
+    missing.push("BOT_TOKEN");
+  }
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required configuration: ${missing.join(", ")}`
+    );
+  }
+
+  return true;
+}
+
+export default botConfig;
+export { botConfig, validateConfig };
