@@ -358,10 +358,10 @@ const botConfig = {
   // =========================
   // FEATURE TOGGLES
   // =========================
-  features: {
+    features: {
     // Enable or disable systems here.
   },
-} 
+};
 
 function validateConfig() {
   return true;
