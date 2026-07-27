@@ -153,19 +153,6 @@ const botConfig = {
     },
   },
 
-  // =========================
-  // ECONOMY SETTINGS
-  // =========================
-  economy: {
-    currency: {
-      // Currency display name.
-      name: "coins",
-      // Plural display name.
-      namePlural: "coins",
-      // Currency symbol shown in balances.
-      symbol: "$",
-    },
-
     // Starting balance for new users.
     startingBalance: 0,
 
@@ -189,14 +176,6 @@ const botConfig = {
     // Jail time after failed rob (milliseconds).
     // 3600000 = 1 hour.
     robFailJailTime: 3600000,
-  },
-
-  // =========================
-  // SHOP SETTINGS
-  // =========================
-  // Add shop defaults here when needed.
-  shop: {
-
   },
 
   // =========================
