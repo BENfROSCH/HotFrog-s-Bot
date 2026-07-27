@@ -398,4 +398,4 @@ function getColor(type = "primary") {
 }
 
 export default botConfig;
-export { botConfig, validateConfig, getColor };
+export { botConfig,  BotConfig, validateConfig, getColor };
