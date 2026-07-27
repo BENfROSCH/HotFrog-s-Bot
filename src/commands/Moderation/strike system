@@ -1,0 +1,600 @@
+import {
+    SlashCommandBuilder,
+    EmbedBuilder,
+    PermissionFlagsBits
+} from "discord.js";
+
+import fs from "fs/promises";
+
+import botConfig from "../../config/config.js";
+
+const DATA_FILE = "./data/strikes.json";
+
+
+// =========================
+// DATABASE
+// =========================
+
+async function loadStrikes() {
+
+    try {
+
+        const data = await fs.readFile(
+            DATA_FILE,
+            "utf8"
+        );
+
+        return JSON.parse(data);
+
+    } catch {
+
+        return {};
+
+    }
+
+}
+
+
+async function saveStrikes(data) {
+
+    await fs.mkdir(
+        "./data",
+        {
+            recursive: true
+        }
+    );
+
+    await fs.writeFile(
+        DATA_FILE,
+        JSON.stringify(data, null, 4)
+    );
+
+}
+
+
+// =========================
+// STRIKE ROLES
+// =========================
+
+async function updateStrikeRole(member, amount) {
+
+    const roles = botConfig.strikes.roles;
+
+
+    // alte Strike Rollen entfernen
+
+    for (const roleId of Object.values(roles)) {
+
+        if (member.roles.cache.has(roleId)) {
+
+            await member.roles.remove(roleId)
+                .catch(() => {});
+
+        }
+
+    }
+
+
+    // neue Strike Rolle geben
+
+    if (amount > 0 && roles[amount]) {
+
+        const role =
+            member.guild.roles.cache.get(
+                roles[amount]
+            );
+
+
+        if (role) {
+
+            await member.roles.add(role)
+                .catch(() => {});
+
+        }
+
+    }
+
+}
+
+
+
+// =========================
+// COMMAND
+// =========================
+
+export default {
+
+    data: new SlashCommandBuilder()
+
+        .setName("strike")
+
+        .setDescription(
+            "Strike System"
+        )
+
+        .setDefaultMemberPermissions(
+            PermissionFlagsBits.ManageMessages
+        )
+
+
+        // ADD
+
+        .addSubcommand(sub =>
+            sub
+
+                .setName("add")
+
+                .setDescription(
+                    "Gibt einem User einen Strike"
+                )
+
+                .addUserOption(option =>
+                    option
+
+                        .setName("user")
+
+                        .setDescription(
+                            "User"
+                        )
+
+                        .setRequired(true)
+                )
+
+
+                .addStringOption(option =>
+                    option
+
+                        .setName("reason")
+
+                        .setDescription(
+                            "Grund"
+                        )
+
+                        .setRequired(true)
+                )
+        )
+
+
+        // REMOVE
+
+        .addSubcommand(sub =>
+            sub
+
+                .setName("remove")
+
+                .setDescription(
+                    "Entfernt einen Strike"
+                )
+
+
+                .addUserOption(option =>
+                    option
+
+                        .setName("user")
+
+                        .setDescription(
+                            "User"
+                        )
+
+                        .setRequired(true)
+                )
+
+
+                .addIntegerOption(option =>
+                    option
+
+                        .setName("number")
+
+                        .setDescription(
+                            "Welcher Strike soll entfernt werden?"
+                        )
+
+                        .setRequired(true)
+                )
+        )
+
+
+        // INFO
+
+        .addSubcommand(sub =>
+            sub
+
+                .setName("info")
+
+                .setDescription(
+                    "Zeigt Strike Verlauf"
+                )
+
+
+                .addUserOption(option =>
+                    option
+
+                        .setName("user")
+
+                        .setDescription(
+                            "User"
+                        )
+
+                        .setRequired(true)
+                )
+        ),
+
+
+
+    async execute(interaction) {
+
+
+        const config =
+            botConfig.strikes;
+
+
+
+        // =========================
+        // PERMISSION
+        // =========================
+
+
+        const isOwner =
+            config.ownerIds.includes(
+                interaction.user.id
+            );
+
+
+        const hasRole =
+            interaction.member.roles.cache.some(
+                role =>
+                    config.managerRoles.includes(
+                        role.id
+                    )
+            );
+
+
+        if (!isOwner && !hasRole) {
+
+            return interaction.reply({
+
+                content:
+                    "❌ Keine Berechtigung.",
+
+                ephemeral: true
+
+            });
+
+        }
+
+
+
+        const user =
+            interaction.options.getUser(
+                "user"
+            );
+
+
+        const member =
+            await interaction.guild.members.fetch(
+                user.id
+            ).catch(() => null);
+
+
+
+        if (!member) {
+
+            return interaction.reply({
+
+                content:
+                    "❌ User nicht gefunden.",
+
+                ephemeral: true
+
+            });
+
+        }
+
+
+
+        const strikes =
+            await loadStrikes();
+
+
+
+        if (!strikes[user.id]) {
+
+            strikes[user.id] = [];
+
+        }
+
+
+
+        const action =
+            interaction.options.getSubcommand();
+
+
+
+
+        // =========================
+        // ADD STRIKE
+        // =========================
+
+
+        if (action === "add") {
+
+
+            if (
+                strikes[user.id].length >=
+                config.maxStrikes
+            ) {
+
+                return interaction.reply({
+
+                    content:
+                        "❌ Dieser User hat bereits die maximale Anzahl an Strikes.",
+
+                    ephemeral: true
+
+                });
+
+            }
+
+
+
+            const reason =
+                interaction.options.getString(
+                    "reason"
+                );
+
+
+
+            strikes[user.id].push({
+
+                reason,
+
+                moderator:
+                    interaction.user.id,
+
+                date:
+                    Date.now()
+
+            });
+
+
+
+            const amount =
+                strikes[user.id].length;
+
+
+
+            await updateStrikeRole(
+                member,
+                amount
+            );
+
+
+            await saveStrikes(
+                strikes
+            );
+
+
+
+            const embed =
+                new EmbedBuilder()
+
+                    .setTitle(
+                        "⚠️ Neuer Strike"
+                    )
+
+                    .setColor(
+                        botConfig.embeds.colors.error
+                    )
+
+                    .addFields(
+
+                        {
+                            name: "User",
+                            value: `${user}`
+                        },
+
+                        {
+                            name: "Grund",
+                            value: reason
+                        },
+
+                        {
+                            name: "Strikes",
+                            value:
+                                `${amount}/${config.maxStrikes}`
+                        },
+
+                        {
+                            name: "Moderator",
+                            value:
+                                `${interaction.user}`
+                        }
+
+                    )
+
+                    .setTimestamp();
+
+
+
+            const channel =
+                interaction.guild.channels.cache.get(
+                    config.channel
+                );
+
+
+            if (channel) {
+
+                await channel.send({
+
+                    embeds: [
+                        embed
+                    ]
+
+                });
+
+            }
+
+
+
+            return interaction.reply({
+
+                content:
+                    "✅ Strike hinzugefügt.",
+
+                ephemeral: true
+
+            });
+
+
+        }
+
+
+
+
+        // =========================
+        // REMOVE STRIKE
+        // =========================
+
+
+        if (action === "remove") {
+
+
+            const number =
+                interaction.options.getInteger(
+                    "number"
+                );
+
+
+            if (!strikes[user.id][number - 1]) {
+
+                return interaction.reply({
+
+                    content:
+                        "❌ Dieser Strike existiert nicht.",
+
+                    ephemeral: true
+
+                });
+
+            }
+
+
+
+            strikes[user.id].splice(
+                number - 1,
+                1
+            );
+
+
+
+            const amount =
+                strikes[user.id].length;
+
+
+
+            await updateStrikeRole(
+                member,
+                amount
+            );
+
+
+            await saveStrikes(
+                strikes
+            );
+
+
+
+            return interaction.reply({
+
+                content:
+                    `✅ Strike entfernt. Aktuell: ${amount}/${config.maxStrikes}`,
+
+                ephemeral: true
+
+            });
+
+
+        }
+
+
+
+
+        // =========================
+        // INFO
+        // =========================
+
+
+        if (action === "info") {
+
+
+            const history =
+                strikes[user.id];
+
+
+
+            if (history.length === 0) {
+
+                return interaction.reply({
+
+                    content:
+                        `ℹ️ ${user} hat keine Strikes.`,
+
+                    ephemeral: true
+
+                });
+
+            }
+
+
+
+            let text = "";
+
+
+
+            history.forEach((strike, index) => {
+
+
+                text +=
+
+                    `**Strike ${index + 1}**\n` +
+
+                    `Grund: ${strike.reason}\n` +
+
+                    `Moderator: <@${strike.moderator}>\n` +
+
+                    `Datum: <t:${Math.floor(strike.date / 1000)}:R>\n\n`;
+
+            });
+
+
+
+            const embed =
+                new EmbedBuilder()
+
+                    .setTitle(
+                        `📋 Strike Verlauf - ${user.username}`
+                    )
+
+                    .setColor(
+                        botConfig.embeds.colors.warning
+                    )
+
+                    .setDescription(
+                        text
+                    );
+
+
+
+            return interaction.reply({
+
+                embeds: [
+                    embed
+                ]
+
+            });
+
+        }
+
+    }
+
+};
