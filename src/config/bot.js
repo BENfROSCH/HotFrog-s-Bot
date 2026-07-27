@@ -540,3 +540,531 @@ export function getRandomColor() {
 }
 
 export default botConfig;
+
+const {
+    SlashCommandBuilder,
+    EmbedBuilder
+} = require("discord.js");
+
+const fs = require("fs");
+
+const DATA = "./strikes.json";
+
+
+// =========================
+// CONFIG
+// =========================
+
+const OWNER_ID = "1403056863976882176";
+
+const STAFF_MANAGER_ROLE = "1496924782493569024";
+
+const STRIKE_CHANNEL_ID = "1523071169950126261";
+
+
+const STRIKE_ROLES = {
+    1: "1523341236746977361",
+    2: "1523341314182349050",
+    3: "1523343298239008850"
+};
+
+
+// =========================
+// DATABASE
+// =========================
+
+function loadStrikes() {
+
+    if (!fs.existsSync(DATA)) {
+        fs.writeFileSync(DATA, "{}");
+    }
+
+    try {
+
+        return JSON.parse(
+            fs.readFileSync(DATA)
+        );
+
+    } catch {
+
+        return {};
+
+    }
+}
+
+
+
+function saveStrikes(data) {
+
+    fs.writeFileSync(
+        DATA,
+        JSON.stringify(data, null, 4)
+    );
+
+}
+
+
+
+// =========================
+// STRIKE ROLE SYSTEM
+// =========================
+
+async function updateStrikeRole(member, amount) {
+
+
+    // Remove all old strike roles
+
+    for (const roleID of Object.values(STRIKE_ROLES)) {
+
+        if (member.roles.cache.has(roleID)) {
+
+            await member.roles.remove(roleID);
+
+        }
+
+    }
+
+
+
+    // Add correct strike role
+
+    if (amount > 0 && STRIKE_ROLES[amount]) {
+
+        const role =
+        member.guild.roles.cache.get(
+            STRIKE_ROLES[amount]
+        );
+
+
+        if (role) {
+
+            await member.roles.add(role);
+
+        }
+
+    }
+
+}
+
+
+
+// =========================
+// COMMAND
+// =========================
+
+module.exports = {
+
+
+data:
+
+new SlashCommandBuilder()
+
+.setName("strike")
+
+.setDescription("Strike management system")
+
+
+// ADD
+
+.addSubcommand(sub =>
+
+    sub
+    .setName("add")
+    .setDescription("Give a strike to a user")
+
+    .addUserOption(option =>
+
+        option
+        .setName("user")
+        .setDescription("User")
+        .setRequired(true)
+
+    )
+
+    .addStringOption(option =>
+
+        option
+        .setName("reason")
+        .setDescription("Reason")
+        .setRequired(true)
+
+    )
+
+)
+
+
+
+// REMOVE
+
+.addSubcommand(sub =>
+
+    sub
+    .setName("remove")
+    .setDescription("Remove a strike")
+
+    .addUserOption(option =>
+
+        option
+        .setName("user")
+        .setDescription("User")
+        .setRequired(true)
+
+    )
+
+)
+
+
+
+// INFO
+
+.addSubcommand(sub =>
+
+    sub
+    .setName("info")
+    .setDescription("View strike history")
+
+    .addUserOption(option =>
+
+        option
+        .setName("user")
+        .setDescription("User")
+        .setRequired(true)
+
+    )
+
+),
+
+
+
+
+async execute(interaction) {
+
+
+    // =========================
+    // PERMISSION CHECK
+    // =========================
+
+    const isOwner =
+    interaction.user.id === OWNER_ID;
+
+
+    const hasStaffRole =
+    interaction.member.roles.cache.has(
+        STAFF_MANAGER_ROLE
+    );
+
+
+    if (!isOwner && !hasStaffRole) {
+
+        return interaction.reply({
+
+            content:
+            "❌ You do not have permission to use this command.",
+
+            ephemeral:true
+
+        });
+
+    }
+
+
+
+    const user =
+    interaction.options.getUser("user");
+
+
+    const member =
+    await interaction.guild.members.fetch(
+        user.id
+    );
+
+
+    let strikes =
+    loadStrikes();
+
+
+
+    if (!strikes[user.id]) {
+
+        strikes[user.id] = [];
+
+    }
+
+
+
+    const command =
+    interaction.options.getSubcommand();
+
+
+
+
+
+    // =========================
+    // ADD STRIKE
+    // =========================
+
+    if (command === "add") {
+
+
+        if (strikes[user.id].length >= 3) {
+
+            return interaction.reply({
+
+                content:
+                "❌ This user already has 3 strikes.",
+
+                ephemeral:true
+
+            });
+
+        }
+
+
+
+        const reason =
+        interaction.options.getString(
+            "reason"
+        );
+
+
+
+        strikes[user.id].push({
+
+            reason: reason,
+
+            moderator:
+            interaction.user.id,
+
+            date:
+            Date.now()
+
+        });
+
+
+
+        const amount =
+        strikes[user.id].length;
+
+
+
+        await updateStrikeRole(
+            member,
+            amount
+        );
+
+
+
+        saveStrikes(strikes);
+
+
+
+
+        const embed =
+        new EmbedBuilder()
+
+        .setTitle(
+            "⚠️ New Strike"
+        )
+
+        .setColor(
+            "Red"
+        )
+
+        .addFields(
+
+            {
+                name:"User",
+                value:`${user}`
+            },
+
+            {
+                name:"Reason",
+                value:reason
+            },
+
+            {
+                name:"Strikes",
+                value:`${amount}/3`
+            },
+
+            {
+                name:"Moderator",
+                value:`${interaction.user}`
+            }
+
+        )
+
+        .setTimestamp();
+
+
+
+
+        const channel =
+        interaction.guild.channels.cache.get(
+            STRIKE_CHANNEL_ID
+        );
+
+
+
+        if (channel) {
+
+            await channel.send({
+
+                embeds:[embed]
+
+            });
+
+        }
+
+
+
+        return interaction.reply({
+
+            content:
+            "✅ Strike has been added.",
+
+            ephemeral:true
+
+        });
+
+    }
+
+
+
+
+
+    // =========================
+    // REMOVE STRIKE
+    // =========================
+
+    if (command === "remove") {
+
+
+
+        if (strikes[user.id].length === 0) {
+
+            return interaction.reply({
+
+                content:
+                "❌ This user has no strikes.",
+
+                ephemeral:true
+
+            });
+
+        }
+
+
+
+        strikes[user.id].pop();
+
+
+
+        const amount =
+        strikes[user.id].length;
+
+
+
+        await updateStrikeRole(
+            member,
+            amount
+        );
+
+
+
+        saveStrikes(strikes);
+
+
+
+        return interaction.reply({
+
+            content:
+            `✅ Strike removed from ${user}. Current strikes: ${amount}/3`,
+
+            ephemeral:true
+
+        });
+
+    }
+
+
+
+
+
+    // =========================
+    // INFO
+    // =========================
+
+    if (command === "info") {
+
+
+
+        const history =
+        strikes[user.id];
+
+
+
+        if (history.length === 0) {
+
+            return interaction.reply({
+
+                content:
+                `ℹ️ ${user} has no strikes.`,
+
+                ephemeral:true
+
+            });
+
+        }
+
+
+
+        let text = "";
+
+
+
+        history.forEach((strike,index)=>{
+
+
+            text +=
+
+            `**Strike ${index + 1}**\n` +
+
+            `Reason: ${strike.reason}\n` +
+
+            `Date: <t:${Math.floor(strike.date / 1000)}:R>\n\n`;
+
+        });
+
+
+
+        const embed =
+        new EmbedBuilder()
+
+        .setTitle(
+            `📋 Strike History - ${user.username}`
+        )
+
+        .setDescription(
+            text
+        )
+
+        .setColor(
+            "Orange"
+        );
+
+
+
+        return interaction.reply({
+
+            embeds:[embed]
+
+        });
+
+    }
+
+
+
+}
+
+};
